@@ -76,12 +76,12 @@ contract WETHSTNDLPTokenSharePool is
     address private operator;
     uint256 public constant DURATION = 60 days;
 
-    uint256 public initreward = 300000 * 10**18;
+    uint256 public initreward = 300000;
     uint256 public starttime; // starttime TBD
-    uint256 public periodFinish = 0;
-    uint256 public rewardRate = 0;
-    uint256 public lastUpdateTime;
-    uint256 public rewardPerTokenStored;
+    uint256 public periodFinish = starttime.add(DURATION);
+    uint256 public rewardRate = initreward.div(DURATION);
+    uint256 public lastUpdateTime = starttime;
+    uint256 public rewardPerTokenStored = 0;
     mapping(address => uint256) public userRewardPerTokenPaid;
     mapping(address => uint256) public rewards;
 
@@ -142,7 +142,6 @@ contract WETHSTNDLPTokenSharePool is
         public
         override
         updateReward(msg.sender)
-        checkhalve
         checkStart
     {
         require(amount > 0, "Cannot stake 0");
@@ -154,7 +153,6 @@ contract WETHSTNDLPTokenSharePool is
         public
         override
         updateReward(msg.sender)
-        checkhalve
         checkStart
     {
         require(amount > 0, "Cannot withdraw 0");
@@ -167,7 +165,7 @@ contract WETHSTNDLPTokenSharePool is
         getReward();
     }
 
-    function getReward() public updateReward(msg.sender) checkhalve checkStart {
+    function getReward() public updateReward(msg.sender) checkStart {
         uint256 reward = earned(msg.sender);
         if (reward > 0) {
             rewards[msg.sender] = 0;
@@ -180,18 +178,7 @@ contract WETHSTNDLPTokenSharePool is
         require(msg.sender == operator, "Not the operator of the pool");
         stnd.safeTransfer(msg.sender, amount);
     }
-
-    modifier checkhalve() {
-        if (block.timestamp >= periodFinish) {
-            initreward = initreward.mul(0).div(100);
-
-            rewardRate = initreward.div(DURATION);
-            periodFinish = block.timestamp.add(DURATION);
-            emit RewardAdded(initreward);
-        }
-        _;
-    }
-
+    
     modifier checkStart() {
         require(block.timestamp >= starttime, "not start");
         _;
@@ -203,22 +190,13 @@ contract WETHSTNDLPTokenSharePool is
         onlyRewardDistribution
         updateReward(address(0))
     {
-        if (block.timestamp > starttime) {
-            if (block.timestamp >= periodFinish) {
-                rewardRate = reward.div(DURATION);
-            } else {
-                uint256 remaining = periodFinish.sub(block.timestamp);
-                uint256 leftover = remaining.mul(rewardRate);
-                rewardRate = reward.add(leftover).div(DURATION);
-            }
-            lastUpdateTime = block.timestamp;
-            periodFinish = block.timestamp.add(DURATION);
-            emit RewardAdded(reward);
-        } else {
+        if (block.timestamp >= starttime) {
             rewardRate = initreward.div(DURATION);
-            lastUpdateTime = starttime;
+            lastUpdateTime = block.timestamp;
             periodFinish = starttime.add(DURATION);
-            emit RewardAdded(reward);
+        } else {
+            lastUpdateTime = starttime;
         }
+        emit RewardAdded(initreward);
     }
 }
